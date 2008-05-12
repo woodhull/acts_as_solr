@@ -16,10 +16,26 @@ namespace :solr do
       puts "Port #{SOLR_PORT} in use" and return
 
     rescue Errno::ECONNREFUSED #not responding
+      #ActsAsSolr::Configation.build
+      File.open("#{SOLR_PATH}/solr/conf/schema.xml", "w") do |f|
+        f.write ActsAsSolr::Configuration.build_schema
+      end
+
+      File.open("#{SOLR_PATH}/solr/conf/solrconfig.xml", "w") do |f|
+        f.write ActsAsSolr::Configuration.build_solrconfig
+      end
+
       Dir.chdir(SOLR_PATH) do
         pid = fork do
           #STDERR.close
-          exec "java -Dsolr.data.dir=solr/data/#{ENV['RAILS_ENV']} -Djetty.port=#{SOLR_PORT} -jar start.jar"
+          # Turn off annoying logging if testing, so it doesn't clutter test
+          # output
+          if ENV['RAILS_ENV'] == "test"
+            STDERR.close
+            exec "java -Dsolr.data.dir=solr/data/#{ENV['RAILS_ENV']} -Djetty.port=#{SOLR_PORT} -jar start.jar"
+          else
+            exec "java -Dsolr.data.dir=solr/data/#{ENV['RAILS_ENV']} -Djetty.port=#{SOLR_PORT} -jar start.jar"
+          end
         end
         sleep(5)
         File.open("#{SOLR_PATH}/tmp/#{ENV['RAILS_ENV']}_pid", "w"){ |f| f << pid}

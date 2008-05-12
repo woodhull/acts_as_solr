@@ -304,7 +304,7 @@
     <lst name="defaults">
      <str name="echoParams">explicit</str>
      <float name="tie">0.01</float>
-     <str name="qf"> description address_country address_state name member_type taggings tones_name description formats_name short_description license_website_usage license_allow_edit title piece_date_pegs topics_name description short_description pieces_taggings pieces_tones_name pieces_description pieces_formats_name pieces_short_description pieces_license_website_usage pieces_license_allow_edit pieces_title pieces_piece_date_pegs pieces_topics_name title station_frequency description address_country address_state station_call_letters name member_type bio first_name last_name favorite_shows login influences im_name title member_type</str>
+     <str name="qf"><%= @fields %></str>
     </lst>
   </requestHandler>
 
@@ -405,7 +405,7 @@
 
    <requestHandler name="mlt" class="solr.MoreLikeThisHandler">
      <lst name="defaults">
-       <str name="mlt.fl"> description address_country address_state name member_type taggings tones_name description formats_name short_description license_website_usage license_allow_edit title piece_date_pegs topics_name description short_description pieces_taggings pieces_tones_name pieces_description pieces_formats_name pieces_short_description pieces_license_website_usage pieces_license_allow_edit pieces_title pieces_piece_date_pegs pieces_topics_name title station_frequency description address_country address_state station_call_letters name member_type bio first_name last_name favorite_shows login influences im_name title member_type</str>
+       <str name="mlt.fl"><%= @fields %></str>
        <int name="mlt.mindf">1</int>
      </lst>
    </requestHandler>

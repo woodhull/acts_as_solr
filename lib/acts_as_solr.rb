@@ -28,6 +28,8 @@ require File.dirname(__FILE__) + '/acts_methods'
 require File.dirname(__FILE__) + '/class_methods'
 require File.dirname(__FILE__) + '/instance_methods'
 require File.dirname(__FILE__) + '/common_methods'
+require File.dirname(__FILE__) + '/configuration'
+require File.dirname(__FILE__) + '/field'
 require File.dirname(__FILE__) + '/deprecation'
 require File.dirname(__FILE__) + '/search_results'
 

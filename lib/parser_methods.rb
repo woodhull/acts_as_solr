@@ -6,50 +6,72 @@ module ActsAsSolr #:nodoc:
     
     # Method used by mostly all the ClassMethods when doing a search
     def parse_query(query=nil, options={}, models=nil)
-      valid_options = [:offset, :limit, :facets, :models, :results_format, :order, :scores, :operator]
+      valid_options = [:offset, :limit, :facets, :models, :results_format, :order, :scores, :operator, :handler, :filter_queries, :sort, :find_options, :morelikethis]
       query_options = {}
+      #set the default handler
+      options = {:handler => 'standard', :filter_queries => [] }.update(options)
       return if query.nil?
       raise "Invalid parameters: #{(options.keys - valid_options).join(',')}" unless (options.keys - valid_options).empty?
       begin
         Deprecation.validate_query(options)
+        query_options[:query] = query
         query_options[:start] = options[:offset]
         query_options[:rows] = options[:limit]
         query_options[:operator] = options[:operator]
+        query_options[:filter_queries] = options[:filter_queries]
         
         # first steps on the facet parameter processing
         if options[:facets]
           query_options[:facets] = {}
           query_options[:facets][:limit] = -1  # TODO: make this configurable
-          query_options[:facets][:sort] = :count if options[:facets][:sort]
-          query_options[:facets][:mincount] = 0
+          query_options[:facets][:sort] = options[:facets][:sort] || false
+          query_options[:facets][:mincount] = options[:facets][:mincount] || 0
           query_options[:facets][:mincount] = 1 if options[:facets][:zeros] == false
-          query_options[:facets][:fields] = options[:facets][:fields].collect{|k| "#{k}_facet"} if options[:facets][:fields]
-          query_options[:filter_queries] = replace_types(options[:facets][:browse].collect{|k| "#{k.sub!(/ *: */,"_facet:")}"}) if options[:facets][:browse]
-          query_options[:facets][:queries] = replace_types(options[:facets][:query].collect{|k| "#{k.sub!(/ *: */,"_t:")}"}) if options[:facets][:query]
+          query_options[:facets][:fields] = options[:facets][:fields] if options[:facets][:fields]
+          query_options[:filter_queries] << options[:facets][:browse] if options[:facets][:browse]
+          query_options[:facets][:queries] = options[:facets][:queries] if options[:facets][:queries]
+        end
+
+        if options[:morelikethis]
+          query_options[:mlt] = options[:morelikethis]
         end
         
         if models.nil?
-          # TODO: use a filter query for type, allowing Solr to cache it individually
-          models = "AND #{solr_configuration[:type_field]}:#{self.name}"
+          models = "#{solr_configuration[:type_field]}:#{self.class_name}"
           field_list = solr_configuration[:primary_key_field]
         else
           field_list = "id"
         end
         
         query_options[:field_list] = [field_list, 'score']
-        query = "(#{query.gsub(/ *: */,"_t:")}) #{models}"
-        order = options[:order].split(/\s*,\s*/).collect{|e| e.gsub(/\s+/,'_t ').gsub(/\bscore_t\b/, 'score')  }.join(',') if options[:order] 
-        query_options[:query] = replace_types([query])[0] # TODO adjust replace_types to work with String or Array  
 
-        if options[:order]
-          # TODO: set the sort parameter instead of the old ;order. style.
-          query_options[:query] << ';' << replace_types([order], false)[0]
+        query_options[:filter_queries] << models
+
+        #either an empty array or passed in
+        query_options[:sort] = options[:sort] || []
+
+        #if options[:order]
+        #  # TODO: bad hack, come back and fix this.
+        #  query_options[:sort] << {replace_types([order], false)[0] => :descending }
+        #end
+
+        #filters should be unique.
+        query_options[:filter_queries] = query_options[:filter_queries].flatten.uniq
+
+        if options[:handler]
+          case options[:handler]
+          when 'standard'
+            result = ActsAsSolr::Post.execute(Solr::Request::Standard.new(query_options))
+          when 'dismax'
+            result = ActsAsSolr::Post.execute(Solr::Request::Dismax.new(query_options))
+          when 'morelikethis'
+            result = ActsAsSolr::Post.execute(Solr::Request::MoreLikeThis.new(query_options))
+          end
         end
-               
-        ActsAsSolr::Post.execute(Solr::Request::Standard.new(query_options))
-      rescue
-        raise "There was a problem executing your search: #{$!}"
-      end            
+      #rescue
+      #  raise "There was a problem executing your search: #{$!}"
+      end
+      result
     end
     
     # Parses the data returned from Solr
@@ -62,17 +84,32 @@ module ActsAsSolr #:nodoc:
         :format => :objects
       }
       results.update(:facets => {'facet_fields' => []}) if options[:facets]
-      return SearchResults.new(results) if solr_data.total == 0
+      return SearchResults.new(results) if solr_data.total_hits == 0
       
       configuration.update(options) if options.is_a?(Hash)
+      result = []
+      if options[:multi]
+        docs = solr_data.hits
+        if options[:results_format] == :objects
+          docs.each{|doc| k = doc.fetch('id').to_s.split(':'); result << k[0].constantize.find_by_id(k[1])}
+        elsif options[:results_format] == :ids
+          docs.each{|doc| result << {"id"=>doc.values.pop.to_s}}
+        end
+      else
+        ids = solr_data.hits.collect {|doc| doc["#{solr_configuration[:primary_key_field]}"]}.flatten
+        conditions = [ "#{self.table_name}.#{primary_key} in (?)", ids ]
+        if options[:find_options]
+          find_options = {:conditions => conditions}.update(options[:find_options])
+        else
+          find_options = {:conditions => conditions}
+        end   
+        result = configuration[:format] == :objects ? reorder(self.find(:all, find_options), ids) : ids
+      end
 
-      ids = solr_data.docs.collect {|doc| doc["#{solr_configuration[:primary_key_field]}"]}.flatten
-      conditions = [ "#{self.table_name}.#{primary_key} in (?)", ids ]
-      result = configuration[:format] == :objects ? reorder(self.find(:all, :conditions => conditions), ids) : ids
       add_scores(result, solr_data) if configuration[:format] == :objects && options[:scores]
       
       results.update(:facets => solr_data.data['facet_counts']) if options[:facets]
-      results.update({:docs => result, :total => solr_data.total, :max_score => solr_data.max_score})
+      results.update({:docs => result, :total => solr_data.total_hits, :max_score => solr_data.max_score})
       SearchResults.new(results)
     end
     
@@ -85,29 +122,6 @@ module ActsAsSolr #:nodoc:
         ordered_things << record
       end
       ordered_things
-    end
-
-    # Replaces the field types based on the types (if any) specified
-    # on the acts_as_solr call
-    def replace_types(strings, include_colon=true)
-      suffix = include_colon ? ":" : ""
-      if configuration[:solr_fields] && configuration[:solr_fields].is_a?(Array)
-        configuration[:solr_fields].each do |solr_field|
-          field_type = get_solr_field_type(:text)
-          if solr_field.is_a?(Hash)
-            solr_field.each do |name,value|
-         	    if value.respond_to?(:each_pair)
-                field_type = get_solr_field_type(value[:type]) if value[:type]
-              else
-                field_type = get_solr_field_type(value)
-              end
-              field = "#{name.to_s}_#{field_type}#{suffix}"
-              strings.each_with_index {|s,i| strings[i] = s.gsub(/#{name.to_s}_t#{suffix}/,field) }
-            end
-          end
-        end
-      end
-      strings
     end
     
     # Adds the score to each one of the instances found

@@ -10,19 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require 'rexml/xpath'
+class Solr::Request::MoreLikeThis < Solr::Request::Standard
 
-class Solr::Response::Ping < Solr::Response::Xml
+  VALID_PARAMS.replace(VALID_PARAMS + [])
 
-  def initialize(xml)
+  def initialize(params)
+    @alternate_query = params.delete(:alternate_query)
+    @sort_values = params.delete(:sort)
+
     super
-    @ok = REXML::XPath.first(@doc, './solr/ping') ? true : false
+
+    @query_type = "mlt"
   end
 
-  # returns true or false depending on whether the ping
-  # was successful or not
-  def ok?
-    @ok
+  def to_hash
+    hash = super
+    return hash
   end
 
 end
