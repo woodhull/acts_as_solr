@@ -65,6 +65,7 @@ class Solr::Request::Standard < Solr::Request::Select
       # TODO need validation of all that is under the :facets Hash too
       hash[:facet] = true
       hash["facet.field"] = []
+      hash["facet.offset"] = @params[:facets][:offset]
       hash["facet.query"] = @params[:facets][:queries]
       hash["facet.sort"] = (@params[:facets][:sort] == :count) if @params[:facets][:sort]
       hash["facet.limit"] = @params[:facets][:limit]
