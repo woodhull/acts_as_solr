@@ -32,6 +32,8 @@ module ActsAsSolr #:nodoc:
         field.known_as =  opts[:known_as] unless opts[:known_as].nil?
         field.value =  opts[:value] unless opts[:value].nil?
         field.facet_display_value = opts[:facet_display_value] unless opts[:value].nil?
+        field.term_vectors =  opts[:term_vectors] unless opts[:term_vectors].nil? 
+        
         # override parameters if a block was provided
         yield field if block_given?
 

@@ -206,7 +206,7 @@ module ActsAsSolr
       unless @@schema_fields.include?(field_name)
         if field.index_type != :association
           # create basic field
-          xml.field(:name => field_name, :type => field.index_type, :termVectors => "true", :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => (field.multivalued? || multivalued).to_s)
+          xml.field(:name => field_name, :type => field.index_type, :termVectors => field.term_vectors?.to_s, :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => (field.multivalued? || multivalued).to_s)
         else
           association_klass = klass.reflect_on_association(field.name).klass
           if association_klass.respond_to?(:index_attr) && association_klass.configuration[solr_classname(association_klass)][:fields]
@@ -216,7 +216,7 @@ module ActsAsSolr
               make_fields( xml, association_klass, association_field, [stack + [field.name]], multivalued)
             end
           else
-            xml.field(:name => field_name, :type => 'text', :termVectors => "true", :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => (field.multivalued? || multivalued).to_s)
+            xml.field(:name => field_name, :type => 'text', :termVectors => field.term_vectors?.to_s, :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => (field.multivalued? || multivalued).to_s)
           end
         end
         # create all appropriate subfields

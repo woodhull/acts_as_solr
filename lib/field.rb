@@ -12,6 +12,7 @@ module ActsAsSolr
         @index_type = :text
         @known_as = nil
         @value = nil
+        @term_vectors = false
         @facet_label = nil
       end
 
@@ -90,6 +91,14 @@ module ActsAsSolr
       end
 
       alias :facet_display_value= :facet_display_value
+      
+      def term_vectors(s = nil)
+        @term_vectors = s unless s.nil?
+        @term_vectors
+      end
+
+      alias :term_vectors= :term_vectors
+      alias :term_vectors? :term_vectors
 
       def include(name = nil, opts = {})
         if name
@@ -104,6 +113,7 @@ module ActsAsSolr
           field.sortable = opts[:sortable] unless opts[:sortable].nil?
           field.facet_label = opts[:facet_label] unless opts[:facet_label].nil?
           field.facet_display_value = opts[:facet_display_value] unless opts[:facet_display_value].nil?
+          field.term_vectors = opts[:term_vectors] unless opts[:term_vectors].nil?  
 
           # override parameters if a block was provided
           yield field if block_given?
