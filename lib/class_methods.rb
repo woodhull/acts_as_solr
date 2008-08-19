@@ -133,7 +133,7 @@ module ActsAsSolr #:nodoc:
     #
     def multi_solr_search(query, options = {})
       models = "(#{solr_configuration[:type_field]}:#{self.class_name}"
-      options[:models].each{|m| models << " OR type:"+m.to_s} if options[:models].is_a?(Array)
+      options[:models].each{|m| models << " OR #{solr_configuration[:type_field]}:"+m.to_s} if options[:models].is_a?(Array)
       options.update(:results_format => :objects) unless options[:results_format]
       data = parse_results(parse_query(query, options, models<<")"), options.update({:multi => ''}))
     end
