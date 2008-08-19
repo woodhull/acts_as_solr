@@ -106,7 +106,8 @@ module ActsAsSolr
 
           xml.field(:name => "id",      :type => "string",   :indexed => "true", :stored => "true")
           xml.field(:name => "pk_i",    :type => "integer",  :indexed => "true", :stored => "true")
-          xml.field(:name => "pk_s",    :type => "string",   :indexed => "true", :stored => "true")              
+          xml.field(:name => "pk_s",    :type => "string",   :indexed => "true", :stored => "true")  
+          xml.field(:name => "type",    :type => "string",   :indexed => "true", :stored => "true")                          
           xml.field(:name => "text",    :type => "text",     :indexed => "true", :stored => "false", :multiValued => "true")
 
           models = c.get_models
