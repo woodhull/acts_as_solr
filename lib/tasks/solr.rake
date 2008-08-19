@@ -2,7 +2,9 @@ require 'rubygems'
 require 'rake'
 require 'net/http'
 require 'active_record'
-require "#{File.dirname(__FILE__)}/../../config/environment.rb"
+require "#{RAILS_ROOT}/config/environment.rb"
+require "#{File.dirname(__FILE__)}/../acts_as_solr"
+
 
 namespace :solr do
 
@@ -16,15 +18,6 @@ namespace :solr do
       puts "Port #{SOLR_PORT} in use" and return
 
     rescue Errno::ECONNREFUSED #not responding
-      #ActsAsSolr::Configation.build
-      File.open("#{SOLR_PATH}/solr/conf/schema.xml", "w") do |f|
-        f.write ActsAsSolr::Configuration.build_schema
-      end
-
-      File.open("#{SOLR_PATH}/solr/conf/solrconfig.xml", "w") do |f|
-        f.write ActsAsSolr::Configuration.build_solrconfig
-      end
-
       Dir.chdir(SOLR_PATH) do
         pid = fork do
           #STDERR.close
@@ -69,6 +62,17 @@ namespace :solr do
       Dir[ SOLR_PATH + "/solr/data/#{ENV['RAILS_ENV']}/index/*"].each{|f| File.unlink(f)}
       Dir.rmdir(SOLR_PATH + "/solr/data/#{ENV['RAILS_ENV']}/index")
       puts "Index files removed under " + ENV['RAILS_ENV'] + " environment"
+    end
+  end
+
+  task :create_configuration do
+    #ActsAsSolr::Configation.build
+    File.open("#{SOLR_PATH}/solr/conf/schema.xml", "w") do |f|
+      f.write ActsAsSolr::Configuration.build_schema
+    end
+
+    File.open("#{SOLR_PATH}/solr/conf/solrconfig.xml", "w") do |f|
+      f.write ActsAsSolr::Configuration.build_solrconfig
     end
   end
 end

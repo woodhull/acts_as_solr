@@ -25,8 +25,34 @@ module ActsAsSolr #:nodoc:
   #   books.max_score
   #   => 1.3213213
   # 
-  # 
+  #
+  module SolrHelper
+    class FacetResult
+      attr_accessor :value
+      attr_accessor :display_value
+      attr_accessor :label
+      attr_accessor :count
+      attr_accessor :field
+    end
+
+    class FacetResults < Array
+      attr_accessor :field
+      attr_accessor :label
+    end
+
+    class FacetQuery
+      attr_accessor :query
+      attr_accessor :field
+      attr_accessor :value
+      attr_accessor :count
+      attr_accessor :label
+    end
+  end
+
+
   class SearchResults
+    attr_accessor :parsed_facets
+
     def initialize(solr_data={})
       @solr_data = solr_data
     end
@@ -34,7 +60,7 @@ module ActsAsSolr #:nodoc:
     # Returns an array with the instances. This method
     # is also aliased as docs and records
     def results
-      @solr_data[:docs]
+      @solr_data[:docs] || []
     end
     
     # Returns the total records found. This method is
@@ -42,12 +68,12 @@ module ActsAsSolr #:nodoc:
     def total
       @solr_data[:total]
     end
-    
+
     # Returns the facets when doing a faceted search
     def facets
       @solr_data[:facets]
     end
-    
+
     # Returns the highest score found. This method is
     # also aliased as highest_score
     def max_score

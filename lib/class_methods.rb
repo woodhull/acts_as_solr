@@ -31,6 +31,7 @@ module ActsAsSolr #:nodoc:
         field.multivalued =  opts[:multivalued] unless opts[:multivalued].nil?
         field.known_as =  opts[:known_as] unless opts[:known_as].nil?
         field.value =  opts[:value] unless opts[:value].nil?
+        field.facet_display_value = opts[:facet_display_value] unless opts[:value].nil?
         # override parameters if a block was provided
         yield field if block_given?
 
@@ -253,9 +254,14 @@ module ActsAsSolr #:nodoc:
         begin
           value = self[field.name] || self.instance_variable_get("@#{field.name.to_s}".to_sym) || self.send(field.name.to_sym)
           case field.index_type
-            # format dates properly; return nil for nil dates
-            when :date: value ? value.utc.strftime("%Y-%m-%dT%H:%M:%SZ") : nil
-            when :association: nil
+            # format dates properly; return nil for nil date
+          when :date
+            if value
+              value.respond_to?(:utc) ? value.utc.strftime("%Y-%m-%dT%H:%M:%SZ") : value.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else
+              nil
+            end
+          when :association: nil
             else value
           end
         rescue

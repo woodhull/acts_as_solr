@@ -5,13 +5,13 @@ module ActsAsSolr #:nodoc:
     protected    
     
     # Method used by mostly all the ClassMethods when doing a search
-    def parse_query(query=nil, options={}, models=nil)
-      valid_options = [:offset, :limit, :facets, :models, :results_format, :order, :scores, :operator, :handler, :filter_queries, :sort, :find_options, :morelikethis]
+    def parse_query(query=nil, options={})
+      valid_options = [:offset, :limit, :facets, :models, :results_format, :order, :scores, :operator, :handler, :filter_queries, :sort, :find_options, :morelikethis, :field_list]
       query_options = {}
       #set the default handler
       options = {:handler => 'standard', :filter_queries => [] }.update(options)
       return if query.nil?
-      raise "Invalid parameters: #{(options.keys - valid_options).join(',')}" unless (options.keys - valid_options).empty?
+      #raise "Invalid parameters: #{(options.keys - valid_options).join(',')}" unless (options.keys - valid_options).empty?
       begin
         Deprecation.validate_query(options)
         query_options[:query] = query
@@ -36,16 +36,15 @@ module ActsAsSolr #:nodoc:
           query_options[:mlt] = options[:morelikethis]
         end
         
-        if models.nil?
-          models = "#{solr_configuration[:type_field]}:#{self.class_name}"
-          field_list = solr_configuration[:primary_key_field]
+        if options[:models]
+          # todo, smarter processing than this. See old find_by_multi
+          query_options[:filter_queries]  << options[:models]
         else
-          field_list = "id"
+          query_options[:filter_queries] << "#{solr_configuration[:type_field]}:#{self.class_name}"
         end
-        
-        query_options[:field_list] = [field_list, 'score']
 
-        query_options[:filter_queries] << models
+        query_options[:field_list] = [solr_configuration[:primary_key_field], solr_configuration[:type_field], 'score']
+        query_options[:field_list] = query_options[:field_list] + options[:field_list] if options[:field_list]
 
         #either an empty array or passed in
         query_options[:sort] = options[:sort] || []
@@ -127,7 +126,7 @@ module ActsAsSolr #:nodoc:
     # Adds the score to each one of the instances found
     def add_scores(results, solr_data)
       with_score = []
-      solr_data.docs.each do |doc|
+      solr_data.hits.each do |doc|
         with_score.push([doc["score"], 
           results.find {|record| record_id(record).to_s == doc["#{solr_configuration[:primary_key_field]}"].to_s }])
       end
@@ -136,6 +135,69 @@ module ActsAsSolr #:nodoc:
         object.solr_score = score
       end
     end
+    
+    #parses the facets into a more usable format.
+    def facets_parser(solr_facets)
+     facets = []
+     if solr_facets && solr_facets['facet_queries']
+       solr_facets['facet_queries'].each do | facet_query, facet_query_count |
+         field = facet_query.split(':')[0]
+         results = facets.find{|result | result.field == field }
+         unless results
+           results = SolrHelper::FacetResults.new
+           results.field = field
+           results.label = label_for_facet(field)
+           facets << results
+         end
+         query = SolrHelper::FacetQuery.new
+         query.field = field
+         query.value = facet_query.split(':')[1]
+         query.query = facet_query
+         query.count = facet_query_count
+         query.label = label_for_facet(facet_query)
+         results << query
+       end
+     end
+
+     if solr_facets && solr_facets['facet_fields']
+       solr_facets['facet_fields'].each do | facet_field_name, facet_field_contents |
+         facet_results = SolrHelper::FacetResults.new
+         facet_results.field = facet_field_name
+         facet_results.label = label_for_facet(facet_field_name)
+         if facet_field_contents.is_a?(Array)
+           facet_field_contents.each_index do | index |
+             if index%2 == 0
+              result = SolrHelper::FacetResult.new
+              result.count = facet_field_contents[index+1]
+              result.label = label_for_facet(facet_field_name)
+              result.field = facet_field_name
+              result.value  = facet_field_contents[index]
+              result.display_value =  facet_field_contents[index]
+              facet_results << result
+             end
+           end
+         elsif facet_field_contents.is_a?(Hash)
+           facet_field_contents.each do | facet_field_value, facet_field_count |
+             result = SolrHelper::FacetResult.new
+             result.count = facet_field_count
+             result.label = label_for_facet(facet_field_name)
+             result.field =  facet_field_name
+             result.value  =  facet_field_value
+             result.display_value  = facet_field_value
+             facet_results << result
+           end
+         end
+         facets << facet_results
+       end
+     end
+     return facets
+    end
+
+    def label_for_facet(field)
+      label=  configuration[name.intern][:fields].select{|key, value| key == field.intern}.first
+      label[1].facet_label || label[0].to_s.capitalize 
+    end
+
   end
 
 end

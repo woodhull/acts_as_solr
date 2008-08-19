@@ -106,7 +106,7 @@ module ActsAsSolr
 
           xml.field(:name => "id",      :type => "string",   :indexed => "true", :stored => "true")
           xml.field(:name => "pk_i",    :type => "integer",  :indexed => "true", :stored => "true")
-          xml.field(:name => "pk_s",    :type => "string",   :indexed => "true", :stored => "true")
+          xml.field(:name => "pk_s",    :type => "string",   :indexed => "true", :stored => "true")              
           xml.field(:name => "text",    :type => "text",     :indexed => "true", :stored => "false", :multiValued => "true")
 
           models = c.get_models
@@ -201,20 +201,22 @@ module ActsAsSolr
       string
     end
 
-    def make_fields(xml, klass, field, stack = [] )
+    def make_fields(xml, klass, field, stack = [], multivalued=false )
       field_name = [stack + [field.name]].join("_")
       unless @@schema_fields.include?(field_name)
         if field.index_type != :association
           # create basic field
-          xml.field(:name => field_name, :type => field.index_type, :termVectors => "true", :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => field.multivalued?.to_s)
+          xml.field(:name => field_name, :type => field.index_type, :termVectors => "true", :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => (field.multivalued? || multivalued).to_s)
         else
           association_klass = klass.reflect_on_association(field.name).klass
           if association_klass.respond_to?(:index_attr) && association_klass.configuration[solr_classname(association_klass)][:fields]
+            # cascade multivalued=true if field is generated through a has_many association.
+            multivalued = true if [:has_many, :has_and_belongs_to_many].include?(klass.reflect_on_association(field.name).macro)
             association_klass.configuration[solr_classname(association_klass)][:fields].each do |key, association_field|
-              make_fields( xml, association_klass, association_field, [stack + [field.name]] )
+              make_fields( xml, association_klass, association_field, [stack + [field.name]], multivalued)
             end
           else
-            xml.field(:name => field_name, :type => 'text', :termVectors => "true", :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => field.multivalued?.to_s)
+            xml.field(:name => field_name, :type => 'text', :termVectors => "true", :indexed => field.indexed?.to_s, :stored => field.stored?.to_s, :multiValued => (field.multivalued? || multivalued).to_s)
           end
         end
         # create all appropriate subfields

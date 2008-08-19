@@ -12,6 +12,7 @@ module ActsAsSolr
         @index_type = :text
         @known_as = nil
         @value = nil
+        @facet_label = nil
       end
 
       def attr_name(name = nil)
@@ -76,9 +77,23 @@ module ActsAsSolr
       alias :multivalued= :multivalued
       alias :multivalued? :multivalued
 
+      def facet_label(s = nil)
+        @facet_label = s unless s.nil?
+        @facet_label
+      end
+
+      alias :facet_label= :facet_label
+
+      def facet_display_value(s = nil)
+        @facet_display_value = s unless s.nil?
+        @facet_display_value
+      end
+
+      alias :facet_display_value= :facet_display_value
+
       def include(name = nil, opts = {})
         if name
-          field = SearchableField.new
+          field = Field.new
           field.attr_name = name.to_sym
           field.indexed_name = opts[:indexed_name].to_sym if opts[:indexed_name]
           field.aliases = opts[:aliases] if opts[:aliases]
@@ -87,6 +102,8 @@ module ActsAsSolr
           field.stored = opts[:stored] unless opts[:stored].nil?
           field.tokenized = opts[:tokenized] unless opts[:tokenized].nil?
           field.sortable = opts[:sortable] unless opts[:sortable].nil?
+          field.facet_label = opts[:facet_label] unless opts[:facet_label].nil?
+          field.facet_display_value = opts[:facet_display_value] unless opts[:facet_display_value].nil?
 
           # override parameters if a block was provided
           yield field if block_given?
